@@ -1,0 +1,6 @@
+[profile.default]
+
+src = "contracts"
+test = "tests"
+
+# You can add more configuration options as needed for your project.
