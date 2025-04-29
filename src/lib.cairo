@@ -30,3 +30,5 @@ mod HelloStarknet {
         }
     }
 }
+
+mod StarkHiveDAO;
