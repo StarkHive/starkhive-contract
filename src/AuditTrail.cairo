@@ -1,4 +1,4 @@
-use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+use starknet::{ContractAddress};
 
 #[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
 pub enum ActionType {
@@ -9,10 +9,10 @@ pub enum ActionType {
 
 #[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
 pub struct AuditEntry {
-    action_type: ActionType,
-    timestamp: u64,
-    actor: ContractAddress,
-    ipfs_hash: felt252
+    pub action_type: ActionType,
+    pub timestamp: u64,
+    pub actor: ContractAddress,
+    pub ipfs_hash: felt252
 }
 
 #[starknet::interface]
@@ -48,7 +48,9 @@ pub mod AuditTrail {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState){}
+    fn constructor(ref self: ContractState){
+
+    }
 
     #[abi(embed_v0)]
     impl AuditTrailImpl of IAuditTrail<ContractState> {
@@ -63,7 +65,7 @@ pub mod AuditTrail {
                 hash = ipfs_hash.unwrap();
             }
 
-            let current_entries = self.audit_entries.entry(job_id);
+            // let current_entries = self.audit_entries.entry(job_id);
             
             let new_entry = AuditEntry {
                 action_type: type_of_action,
