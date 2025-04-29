@@ -61,7 +61,9 @@ func test_create_referral():
     )
     
     // Create a referral
+    %{ stop_prank = start_prank(caller_address=REFERRER) %}
     let (success) = referral_reward.create_referral(REFERRER, REFEREE)
+    %{ stop_prank() %}
     assert success = 1
     
     // Check referrer is set correctly
@@ -83,8 +85,10 @@ func test_prevent_self_referral():
     )
     
     // Try to create a self-referral
+    %{ stop_prank = start_prank(caller_address=REFERRER) %}
     %{ expect_revert("Cannot refer yourself") %}
     let (success) = referral_reward.create_referral(REFERRER, REFERRER)
+    %{ stop_prank() %}
     
     return ()
 end
@@ -101,12 +105,16 @@ func test_prevent_duplicate_referral():
     )
     
     // Create a referral
+    %{ stop_prank = start_prank(caller_address=REFERRER) %}
     let (success1) = referral_reward.create_referral(REFERRER, REFEREE)
+    %{ stop_prank() %}
     assert success1 = 1
     
     // Try to create a duplicate referral with different referrer
+    %{ stop_prank = start_prank(caller_address=OTHER_USER) %}
     %{ expect_revert("Referee already has a referrer") %}
     let (success2) = referral_reward.create_referral(OTHER_USER, REFEREE)
+    %{ stop_prank() %}
     
     return ()
 end
@@ -123,6 +131,7 @@ func test_cooldown_period():
     )
     
     // Create a referral
+    %{ stop_prank_callable = start_prank(caller_address=REFERRER) %}
     let (success1) = referral_reward.create_referral(REFERRER, REFEREE)
     assert success1 = 1
     
@@ -135,7 +144,6 @@ func test_cooldown_period():
     assert time_left > 0
     
     // Advance time beyond cooldown
-    %{ stop_prank_callable = start_prank(caller_address=REFERRER) %}
     %{ warp(86401) %} // 1 day + 1 second
     
     // Check time again - should be zero
@@ -165,18 +173,20 @@ func test_process_job_completion():
     // Create a job for the referee
     %{ stop_prank_callable = start_prank(caller_address=OWNER) %}
     let (job_id) = job_agreement.propose_job(OWNER, REFEREE, 0x123)
+    %{ stop_prank_callable() %}
     
     // Create a referral
+    %{ stop_prank_callable2 = start_prank(caller_address=REFERRER) %}
     let (success) = referral_reward.create_referral(REFERRER, REFEREE)
+    %{ stop_prank_callable2() %}
     assert success = 1
     
     // Move job to active state
-    %{ stop_prank_callable() %}
-    %{ stop_prank_callable2 = start_prank(caller_address=REFEREE) %}
+    %{ stop_prank_callable3 = start_prank(caller_address=REFEREE) %}
     job_agreement.accept_job(job_id)
-    %{ stop_prank_callable2() %}
+    %{ stop_prank_callable3() %}
     
-    %{ stop_prank_callable3 = start_prank(caller_address=OWNER) %}
+    %{ stop_prank_callable4 = start_prank(caller_address=OWNER) %}
     job_agreement.activate_job(job_id)
     
     // Complete the job
@@ -197,7 +207,7 @@ func test_process_job_completion():
     let (completion_success2) = referral_reward.process_job_completion(job_id)
     assert completion_success2 = 1
     
-    %{ stop_prank_callable3() %}
+    %{ stop_prank_callable4() %}
     
     return ()
 end
