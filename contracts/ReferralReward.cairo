@@ -106,6 +106,7 @@ func assert_only_owner{
     let (caller) = get_caller_address()
     let (current_owner) = owner.read()
     assert caller = current_owner
+    with_attr error_message("Caller is not the owner") {}
     return ()
 end
 
@@ -122,14 +123,17 @@ func create_referral{
     let (caller) = get_caller_address()
     
     // Ensure caller is the referrer (you can only create referrals for yourself)
-    assert caller = referrer, 'Only referrer can create referrals'
+    assert caller = referrer
+    with_attr error_message("Only referrer can create referrals") {}
     
     // Prevent self-referrals
-    assert referrer != referee, 'Cannot refer yourself'
+    assert referrer != referee
+    with_attr error_message("Cannot refer yourself") {}
     
     // Check if referee already has a referrer
     let (existing_referrer) = referrals.read(referee)
-    assert existing_referrer = 0, 'Referee already has a referrer'
+    assert existing_referrer = 0
+    with_attr error_message("Referee already has a referrer") {}
     
     // Check cooldown period
     let (current_time) = get_block_timestamp()
@@ -137,7 +141,8 @@ func create_referral{
     let (cooldown) = cooldown_period.read()
     
     // Ensure cooldown has passed
-    assert current_time - last_time >= cooldown, 'Cooldown period not elapsed'
+    assert current_time - last_time >= cooldown
+    with_attr error_message("Cooldown period not elapsed") {}
     
     // Create referral relationship
     referrals.write(referee, referrer)
@@ -165,7 +170,8 @@ func process_job_completion{
     
     // Verify job is completed
     let (state) = IJobAgreement.job_state(job_contract, job_id)
-    assert state = JOB_STATE_COMPLETED, 'Job not completed'
+    assert state = JOB_STATE_COMPLETED
+    with_attr error_message("Job not completed") {}
     
     // Get freelancer of the job
     let (freelancer) = IJobAgreement.freelancer_of(job_contract, job_id)
@@ -195,7 +201,8 @@ func process_job_completion{
     
     // Send reward to referrer
     let (success) = IERC20.transfer(token, referrer, amount)
-    assert success = TRUE, 'Token transfer failed'
+    assert success = TRUE
+    with_attr error_message("Token transfer failed") {}
     
     // Emit event
     RewardClaimed.emit(referrer, freelancer, amount)
