@@ -32,3 +32,4 @@
 // }
 
 pub mod AuditTrail;
+pub mod WhitelistVerifier;
