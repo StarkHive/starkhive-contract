@@ -5,7 +5,7 @@ use starkhive_contract::AuditTrail::{IAuditTrailDispatcher, IAuditTrailDispatche
 use starkhive_contract::AuditTrail::ActionType;
 
 fn deploy_contract() -> (ContractAddress, IAuditTrailDispatcher) {
-    let contract = declare("starkhive_contract").unwrap().contract_class();
+    let contract = declare("AuditTrail").unwrap().contract_class();
     let (contract_address, _) = contract.deploy(@ArrayTrait::new()).unwrap();
     let dispatcher = IAuditTrailDispatcher { contract_address };
     
