@@ -10,6 +10,7 @@ pub trait IWhitelistVerifier<TContractState> {
 
 #[starknet::contract]
 pub mod WhitelistVerifier {
+    use super::{IWhitelistVerifier};
     use starknet::{ContractAddress, get_caller_address};
     use starknet::event::EventEmitter;
     use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
@@ -67,14 +68,14 @@ pub mod WhitelistVerifier {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState){
+    fn constructor(ref self: ContractState, owner: ContractAddress) {
         self.accesscontrol.initializer();
-        // Grant the contract deployer the admin role:
-        self.accesscontrol._grant_role(ADMIN_ROLE, get_caller_address());
+        // Grant the owner the admin role:
+        self.accesscontrol._grant_role(ADMIN_ROLE, owner);
     }
 
     #[abi(embed_v0)]
-    impl WhitelistVerifierImpl of super::IWhitelistVerifier<ContractState> {
+    impl WhitelistVerifierImpl of IWhitelistVerifier<ContractState> {
         fn is_whitelisted(self: @ContractState, wallet_address: ContractAddress) -> bool {
             self.whitelist.read(wallet_address)
         }
