@@ -33,3 +33,4 @@
 
 pub mod AuditTrail;
 pub mod WhitelistVerifier;
+pub mod StarkHiveDAO;

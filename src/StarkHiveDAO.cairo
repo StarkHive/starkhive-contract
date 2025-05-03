@@ -17,23 +17,23 @@ pub trait IStarkHiveDAO<TContractState> {
 
 #[starknet::contract]
 pub mod StarkHiveDAO {
-    use core::hash::{HashStateExTrait, HashStateTrait};
-    use core::poseidon::{PoseidonTrait, poseidon_hash_span};
+    use core::hash::{HashStateTrait};
+    use core::poseidon::{PoseidonTrait};
     use starknet::storage::{
-        Map, StorageMapWriteAccess, StoragePathEntry, StoragePointerReadAccess,
+        Map, StoragePathEntry, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
 
     #[derive(Drop, Serde, starknet::Store)]
-    struct Proposal {
-        owner: ContractAddress,
-        title: felt252,
-        description_hash: felt252,
-        action_hash: felt252,
-        deadline: u64,
-        positive_votes: u64,
-        negative_votes: u64,
+    pub struct Proposal {
+        pub owner: ContractAddress,
+        pub title: felt252,
+        pub description_hash: felt252,
+        pub action_hash: felt252,
+        pub deadline: u64,
+        pub positive_votes: u64,
+        pub negative_votes: u64,
     }
 
     #[storage]
@@ -53,25 +53,25 @@ pub mod StarkHiveDAO {
 
     #[derive(Drop, starknet::Event)]
     pub struct ProposalCreation {
-        proposal_id: felt252,
-        title: felt252,
-        description_hash: felt252,
-        action_hash: felt252,
-        deadline: u64,
+        pub proposal_id: felt252,
+        pub title: felt252,
+        pub description_hash: felt252,
+        pub action_hash: felt252,
+        pub deadline: u64,
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct CastVote {
-        voter: ContractAddress,
-        proposal_id: felt252,
-        vote: bool
+        pub voter: ContractAddress,
+        pub proposal_id: felt252,
+        pub vote: bool
     }
 
     #[derive(Drop, starknet::Event)]
     pub struct ActionExecution {
-        proposal_id: felt252,
-        action_hash: felt252,
-        timestamp: u64
+        pub proposal_id: felt252,
+        pub action_hash: felt252,
+        pub timestamp: u64
     }
 
     #[abi(embed_v0)]
