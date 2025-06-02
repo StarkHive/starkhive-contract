@@ -208,8 +208,6 @@ pub mod Jobs {
 
             job.status = Status::Completed;
 
-            // let token = self.strk_token_address.read();
-
             let success = self.pay_applicant(job.applicant, job.budget);
 
             assert(success, 'Applicant payment failed');

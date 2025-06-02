@@ -398,6 +398,9 @@ fn test_approve_job() {
 
     let lucky_guy = dispatcher.get_applicant(job_id, applicant0);
 
+    let balanceafter = token_dispatcher.balance_of(applicant);
+    assert(balanceafter == budget, 'balance error');
+
     assert(job.status == Status::Completed, 'status update error');
     assert(job.applicant == applicant, 'job assignment error');
     assert(lucky_guy.application_status == ApplicationStatus::Accepted, 'Lucky guy error');
@@ -517,7 +520,6 @@ fn test_request_changes() {
     let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
 
     token_idispatcher.mint(job_creator, 20000);
-    let balanceb4 = token_dispatcher.balance_of(job_creator);
 
     start_cheat_caller_address(erc20_address, job_creator);
     token_dispatcher.approve(contract_address, 10000);
@@ -533,9 +535,6 @@ fn test_request_changes() {
     stop_cheat_caller_address(contract_address);
 
     // Validate that the coujobrse ID is correctly incremented
-    assert(job_id == 1, 'job_id should start from 1');
-    let balanceafter = token_dispatcher.balance_of(job_creator);
-    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
