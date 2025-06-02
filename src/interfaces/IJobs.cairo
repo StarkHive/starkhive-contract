@@ -33,7 +33,7 @@ pub trait IJobs<TContractState> {
     fn approve_submission(
         ref self: TContractState, token: ContractAddress, job_id: u256, applicant_id: u256,
     );
-    fn cancel_job(ref self: TContractState, job_id: u256, applicant_id: u256);
+    fn cancel_job(ref self: TContractState, token: ContractAddress, job_id: u256);
     fn reject_submission(ref self: TContractState, job_id: u256, applicant_id: u256);
     fn request_changes(ref self: TContractState, job_id: u256, applicant_id: u256);
     fn get_all_job_applicants(self: @TContractState, job_id: u256) -> Array<Applicant>;

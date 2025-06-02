@@ -77,6 +77,8 @@ fn test_job() {
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
 
+    let contract_balance = token_dispatcher.balance_of(contract_address);
+
     let balanceafter = token_dispatcher.balance_of(user);
     assert(balanceafter == (balanceb4 - budget), 'balance error');
 
@@ -84,6 +86,7 @@ fn test_job() {
     let job = dispatcher.get_job(job_id);
 
     assert(job.title == title, 'job title mismatch');
+    assert(contract_balance == budget, 'Contract did not get funds');
     assert(job.owner == user, 'job owner mismatch');
     assert(job.description == description, 'job description mismatch');
     assert(job.budget == budget, 'job budget mismatch');
@@ -92,6 +95,63 @@ fn test_job() {
     assert(job.status == Status::Open, 'Job Status mismatch');
     assert(job.deadline == deadline, 'job deadline mismatch');
     assert(job.created_at == get_block_timestamp(), 'job created mismatch');
+}
+#[test]
+fn test_cancel_job() {
+    let (contract_address, erc20_address) = setup();
+    let dispatcher = IJobsDispatcher { contract_address };
+
+    // Test input values
+    let user: ContractAddress = contract_address_const::<'user'>();
+    let title: felt252 = 'Cairo Developer';
+    let description: ByteArray = "Build Cairo dApps";
+    let budget: u256 = 500;
+    let deadline = get_block_timestamp() + 84600;
+    let requirements: ByteArray = "2years Cairo experience";
+
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(user, 20000);
+
+    stop_cheat_caller_address(contract_address);
+
+    let balanceb4 = token_dispatcher.balance_of(user);
+
+    start_cheat_caller_address(erc20_address, user);
+
+    token_dispatcher.approve(contract_address, 10000);
+
+    stop_cheat_caller_address(contract_address);
+
+    // Ensure the caller is the admin
+    start_cheat_caller_address(contract_address, user);
+    // Call create_job
+    let job_id = dispatcher
+        .create_job(
+            erc20_address, title, description.clone(), budget, deadline, requirements.clone(), user,
+        );
+
+    start_cheat_caller_address(erc20_address, contract_address);
+    token_dispatcher.approve(user, budget);
+    stop_cheat_caller_address(contract_address);
+    // Validate that the coujobrse ID is correctly incremented
+    assert(job_id == 1, 'job_id should start from 1');
+
+    start_cheat_caller_address(contract_address, user);
+    dispatcher.cancel_job(erc20_address, job_id);
+    stop_cheat_caller_address(contract_address);
+
+    let balanceafter = token_dispatcher.balance_of(user);
+    assert(balanceafter == balanceb4, 'balance error');
+    stop_cheat_caller_address(contract_address);
+    // Retrieve the job to verify it was stored correctly
+    let job = dispatcher.get_job(job_id);
+
+    assert(job.status == Status::Cancelled, 'Job Status mismatch');
 }
 
 #[test]
@@ -412,6 +472,10 @@ fn test_approve_job() {
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
     dispatcher.submit_job(job_id, applicant0);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(erc20_address, contract_address);
+    token_dispatcher.approve(job_creator, budget);
     stop_cheat_caller_address(contract_address);
 
     start_cheat_caller_address(contract_address, job_creator);

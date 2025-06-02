@@ -30,6 +30,7 @@ pub mod Jobs {
         JobAccepted: JobAccepted,
         JobRejected: JobRejected,
         JobDisputed: JobDisputed,
+        JobCancelled: JobCancelled,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -39,6 +40,13 @@ pub mod Jobs {
         pub title: felt252,
         pub author: ContractAddress,
     }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct JobCancelled {
+        job_id: u256,
+        cancelled_by: ContractAddress,
+    }
+
 
     #[derive(Drop, starknet::Event)]
     pub struct JobAssigned {
@@ -213,23 +221,33 @@ pub mod Jobs {
 
             self.emit(JobAccepted { job_id, assignee: caller });
         }
-        fn cancel_job(ref self: ContractState, job_id: u256, applicant_id: u256) {
+        fn cancel_job(ref self: ContractState, token: ContractAddress, job_id: u256) {
             let caller = get_caller_address();
             let mut job = self.get_job(job_id);
-            let mut applicant = self.job_applicants.read((job_id, applicant_id));
 
             assert(job.owner == caller, 'Not your job');
-
-            applicant.application_status = ApplicationStatus::JobCancelled;
+            assert(job.status == Status::Open, 'job cannot be cancelled');
 
             job.status = Status::Cancelled;
 
-            self.job_applicants.write((job_id, applicant_id), applicant);
+            let receiver = job.owner;
+            let amount = job.budget;
 
+            let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
+            let contract_address = get_contract_address();
+            let contract_balance = erc20_dispatcher.balance_of(contract_address);
+
+            assert(contract_balance >= amount, 'insufficient balance contract');
+
+            let success = self.pay_applicant(token, receiver, amount);
+            assert(success, 'refund transfer failed');
+
+            job.budget = 0;
             self.jobs.write(job_id, job);
 
-            self.emit(JobAccepted { job_id, assignee: caller });
+            self.emit(JobCancelled { job_id, cancelled_by: caller });
         }
+
 
         fn reject_submission(ref self: ContractState, job_id: u256, applicant_id: u256) {
             let caller = get_caller_address();
@@ -337,10 +355,10 @@ pub mod Jobs {
             assert(contract_allowance >= amount, 'INSUFFICIENT_ALLOWANCE');
             assert(caller_balance >= amount, 'insufficient bal');
 
-            let pull_back_res = erc20_dispatcher.transfer_from(depositor, contract_address, amount);
-            assert(pull_back_res, 'DEPOSIT failed');
+            let deposit_funds = erc20_dispatcher.transfer_from(depositor, contract_address, amount);
+            assert(deposit_funds, 'DEPOSIT failed');
 
-            pull_back_res
+            deposit_funds
         }
 
         fn pay_applicant(
@@ -352,11 +370,14 @@ pub mod Jobs {
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
             let contract_address = get_contract_address();
             let contract_balance = erc20_dispatcher.balance_of(contract_address);
-            assert(contract_balance >= amount, 'insufficient bal');
+
+            assert(contract_balance >= amount, 'insufficient balance');
             let success = erc20_dispatcher.transfer(receiver, amount);
             assert(success, 'payment failed');
+
             success
         }
+
 
         fn check_balance(
             self: @ContractState, token: ContractAddress, address: ContractAddress,
