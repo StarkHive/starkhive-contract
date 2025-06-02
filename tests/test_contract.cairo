@@ -1,48 +1,82 @@
+use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
-    stop_cheat_caller_address,
+    start_cheat_caller_address, stop_cheat_caller_address,
 };
 use starkhive_contract::base::types::{ApplicationStatus, Job, Status};
+use starkhive_contract::contracts::MockUSDC::{IExternalDispatcher, IExternalDispatcherTrait};
 use starkhive_contract::interfaces::IJobs::{IJobsDispatcher, IJobsDispatcherTrait};
-use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
+use starknet::{ContractAddress, contract_address, contract_address_const, get_block_timestamp};
 
 
-fn setup() -> ContractAddress {
+fn setup() -> (ContractAddress, ContractAddress) {
     let declare_result = declare("Jobs");
     assert(declare_result.is_ok(), 'Contract declaration failed');
 
+    let erc20_contract = deploy_erc20();
+    let erc20_address = erc20_contract.contract_address;
     let contract_class = declare_result.unwrap().contract_class();
-    let mut calldata = array![];
+    let mut calldata = array![erc20_address.into()];
 
     let deploy_result = contract_class.deploy(@calldata);
     assert(deploy_result.is_ok(), 'Contract deployment failed');
 
     let (contract_address, _) = deploy_result.unwrap();
 
-    contract_address
+    (contract_address, erc20_address)
 }
+
+fn deploy_erc20() -> IExternalDispatcher {
+    let owner: ContractAddress = contract_address_const::<'owner'>();
+
+    let contract_class = declare("MockUsdc").unwrap().contract_class();
+    let (contract_address, _) = contract_class.deploy(@array![owner.into(), owner.into()]).unwrap();
+
+    IExternalDispatcher { contract_address }
+}
+
 #[test]
 fn test_job() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
     let user: ContractAddress = contract_address_const::<'user'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
 
-    // Ensure the caller is the admin
-    cheat_caller_address(contract_address, user, CheatSpan::Indefinite);
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
 
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(user, 20000);
+
+    stop_cheat_caller_address(contract_address);
+
+    let balanceb4 = token_dispatcher.balance_of(user);
+
+    start_cheat_caller_address(erc20_address, user);
+
+    token_dispatcher.approve(contract_address, 10000);
+
+    stop_cheat_caller_address(contract_address);
+
+    // Ensure the caller is the admin
+    start_cheat_caller_address(contract_address, user);
     // Call create_job
     let job_id = dispatcher
         .create_job(title, description.clone(), budget, deadline, requirements.clone(), user);
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+
+    let balanceafter = token_dispatcher.balance_of(user);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     // Retrieve the job to verify it was stored correctly
     let job = dispatcher.get_job(job_id);
@@ -60,22 +94,35 @@ fn test_job() {
 
 #[test]
 fn test_assign_job() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
 
     // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
 
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
     // Call create_job
     let job_id = dispatcher
         .create_job(
@@ -87,6 +134,8 @@ fn test_assign_job() {
     stop_cheat_caller_address(contract_address);
 
     assert(job_id == 1, 'job_id should start from 1');
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -116,24 +165,37 @@ fn test_assign_job() {
 
 #[test]
 fn test_multiple_apply_job() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
-    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
-    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
+    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
+    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
 
     // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
 
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
     // Call create_job
     let job_id = dispatcher
         .create_job(
@@ -142,6 +204,8 @@ fn test_multiple_apply_job() {
     stop_cheat_caller_address(contract_address);
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -168,24 +232,38 @@ fn test_multiple_apply_job() {
 
 #[test]
 fn test_submit_job() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
-    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
-    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
 
-    // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
+    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
+    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
 
+    // Ensure the caller is the admin
+
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
     // Call create_job
     let job_id = dispatcher
         .create_job(
@@ -195,6 +273,8 @@ fn test_submit_job() {
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -235,33 +315,52 @@ fn test_submit_job() {
 
 #[test]
 fn test_approve_job() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
-    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
-    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
 
-    // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
+    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
+    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
 
+    // Ensure the caller is the admin
+
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
     // Call create_job
     let job_id = dispatcher
         .create_job(
             title, description.clone(), budget, deadline, requirements.clone(), job_creator,
         );
     stop_cheat_caller_address(contract_address);
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+
+    assert(balanceafter == (balanceb4 - budget), 'Balance error');
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
+    stop_cheat_caller_address(contract_address);
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -291,7 +390,7 @@ fn test_approve_job() {
     dispatcher.submit_job(job_id, applicant0);
     stop_cheat_caller_address(contract_address);
 
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
+    start_cheat_caller_address(contract_address, job_creator);
     dispatcher.approve_submission(job_id, applicant0);
     stop_cheat_caller_address(contract_address);
 
@@ -306,24 +405,38 @@ fn test_approve_job() {
 
 #[test]
 fn test_reject_submission() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
-    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
-    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
 
-    // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
+    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
+    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
 
+    // Ensure the caller is the admin
+
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
     // Call create_job
     let job_id = dispatcher
         .create_job(
@@ -333,6 +446,8 @@ fn test_reject_submission() {
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -378,23 +493,37 @@ fn test_reject_submission() {
 
 #[test]
 fn test_request_changes() {
-    let contract_address = setup();
+    let (contract_address, erc20_address) = setup();
     let dispatcher = IJobsDispatcher { contract_address };
 
     // Test input values
-    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let job_creator: ContractAddress = contract_address_const::<'user'>();
     let applicant: ContractAddress = contract_address_const::<'applicant'>();
-    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
-    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     let title: felt252 = 'Cairo Developer';
     let description: ByteArray = "Build Cairo dApps";
-    let budget: u256 = 0;
+    let budget: u256 = 500;
     let deadline = get_block_timestamp() + 84600;
     let requirements: ByteArray = "2years Cairo experience";
     let qualification: ByteArray = "2years Cairo experience";
 
+    let applicant1: ContractAddress = contract_address_const::<'applicant1'>();
+    let applicant2: ContractAddress = contract_address_const::<'applicant2'>();
     // Ensure the caller is the admin
-    cheat_caller_address(contract_address, job_creator, CheatSpan::Indefinite);
+
+    let sender: ContractAddress = contract_address_const::<'owner'>();
+    start_cheat_caller_address(contract_address, sender);
+
+    let token_dispatcher = IERC20Dispatcher { contract_address: erc20_address };
+    let token_idispatcher = IExternalDispatcher { contract_address: erc20_address };
+
+    token_idispatcher.mint(job_creator, 20000);
+    let balanceb4 = token_dispatcher.balance_of(job_creator);
+
+    start_cheat_caller_address(erc20_address, job_creator);
+    token_dispatcher.approve(contract_address, 10000);
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, job_creator);
 
     // Call create_job
     let job_id = dispatcher
@@ -405,6 +534,8 @@ fn test_request_changes() {
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
+    let balanceafter = token_dispatcher.balance_of(job_creator);
+    assert(balanceafter == (balanceb4 - budget), 'balance error');
 
     cheat_caller_address(contract_address, applicant, CheatSpan::Indefinite);
 
@@ -446,9 +577,4 @@ fn test_request_changes() {
     assert(job.applicant == applicant, 'job assignment error');
     assert(lucky_guy.application_status == ApplicationStatus::Pending, 'Lucky guy error');
 }
-// #[test]
-// #[should_panic(expected: ('Not the content creator',))]
-
-// println!("Array len: {}", job.len());
-
 

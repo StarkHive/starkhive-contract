@@ -1,6 +1,8 @@
 #[starknet::contract]
 pub mod Jobs {
+    // use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
     use starkhive_contract::base::types::{Applicant, ApplicationStatus, Job, Status};
+    use starkhive_contract::contracts::MockUSDC::{IExternalDispatcher, IExternalDispatcherTrait};
     use starkhive_contract::interfaces::IJobs::IJobs;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
@@ -8,6 +10,7 @@ pub mod Jobs {
     };
     use starknet::{
         ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+        get_contract_address,
     };
 
     #[storage]
@@ -16,6 +19,7 @@ pub mod Jobs {
         jobs: Map<u256, Job>,
         job_counter: u256,
         job_applicants: Map<(u256, u256), Applicant>,
+        strk_token_address: ContractAddress,
     }
 
     #[event]
@@ -81,6 +85,10 @@ pub mod Jobs {
         pub time: u64,
     }
 
+    #[constructor]
+    fn constructor(ref self: ContractState, erc20: ContractAddress) {
+        self.strk_token_address.write(erc20);
+    }
 
     #[abi(embed_v0)]
     impl JobsImpl of IJobs<ContractState> {
@@ -115,6 +123,15 @@ pub mod Jobs {
                 updated_at: timestamp,
                 created_at: timestamp,
             };
+
+            let token = self.strk_token_address.read();
+
+            let erc20_dispatcher = IExternalDispatcher { contract_address: token };
+            let contract_address = get_contract_address();
+            let success = erc20_dispatcher.transferr(contract_address, budget);
+            // self.deposit(owner, token, budget);
+
+            assert(success, 'budget deposit failed');
 
             self.jobs.write(id, new_job);
 
@@ -190,6 +207,12 @@ pub mod Jobs {
             applicant.application_status = ApplicationStatus::Accepted;
 
             job.status = Status::Completed;
+
+            // let token = self.strk_token_address.read();
+
+            let success = self.pay_applicant(job.applicant, job.budget);
+
+            assert(success, 'Applicant payment failed');
 
             self.job_applicants.write((job_id, applicant_id), applicant);
 
@@ -305,6 +328,44 @@ pub mod Jobs {
             // Retrieve and return the job
             let job = self.jobs.read(job_id);
             job
+        }
+
+
+        fn deposit(ref self: ContractState, depositor: ContractAddress, amount: u256) -> bool {
+            let token = self.strk_token_address.read();
+            let erc20_dispatcher = IExternalDispatcher { contract_address: token };
+            let contract_address = get_contract_address();
+            let caller_balance = erc20_dispatcher.balance(depositor);
+            erc20_dispatcher.approve_user(contract_address, amount);
+            let contract_allowance = erc20_dispatcher.get_allowance(depositor, contract_address);
+            assert(contract_allowance >= amount, 'INSUFFICIENT_ALLOWANCE');
+            assert(caller_balance >= amount, 'insufficient bal');
+
+            let pull_back_res = erc20_dispatcher
+                .transfer_fromm(depositor, contract_address, amount);
+            assert(pull_back_res, 'DEPOSIT failed');
+
+            pull_back_res
+        }
+
+        fn pay_applicant(ref self: ContractState, receiver: ContractAddress, amount: u256) -> bool {
+            let token = self.strk_token_address.read();
+            let erc20_dispatcher = IExternalDispatcher { contract_address: token };
+            let contract_address = get_contract_address();
+            let contract_balance = erc20_dispatcher.balance(contract_address);
+            assert(contract_balance >= amount, 'insufficient bal');
+            let success = erc20_dispatcher.transferr(receiver, amount);
+            assert(success, 'payment failed');
+            success
+        }
+
+        fn check_balance(self: @ContractState, address: ContractAddress) -> u256 {
+            let token = self.strk_token_address.read();
+            let erc20_dispatcher = IExternalDispatcher { contract_address: token };
+
+            let balance = erc20_dispatcher.balance(address);
+
+            balance
         }
     }
 }
