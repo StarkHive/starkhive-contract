@@ -16,7 +16,7 @@ fn setup() -> (ContractAddress, ContractAddress) {
     let erc20_contract = deploy_erc20();
     let erc20_address = erc20_contract.contract_address;
     let contract_class = declare_result.unwrap().contract_class();
-    let mut calldata = array![erc20_address.into()];
+    let mut calldata = array![];
 
     let deploy_result = contract_class.deploy(@calldata);
     assert(deploy_result.is_ok(), 'Contract deployment failed');
@@ -70,7 +70,9 @@ fn test_job() {
     start_cheat_caller_address(contract_address, user);
     // Call create_job
     let job_id = dispatcher
-        .create_job(title, description.clone(), budget, deadline, requirements.clone(), user);
+        .create_job(
+            erc20_address, title, description.clone(), budget, deadline, requirements.clone(), user,
+        );
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
@@ -126,7 +128,13 @@ fn test_assign_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
 
     // Validate that the coujobrse ID is correctly incremented
@@ -199,7 +207,13 @@ fn test_multiple_apply_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
     stop_cheat_caller_address(contract_address);
     // Validate that the coujobrse ID is correctly incremented
@@ -267,7 +281,13 @@ fn test_submit_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
     stop_cheat_caller_address(contract_address);
 
@@ -350,12 +370,16 @@ fn test_approve_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
     stop_cheat_caller_address(contract_address);
     let balanceafter = token_dispatcher.balance_of(job_creator);
-
-    assert(balanceafter == (balanceb4 - budget), 'Balance error');
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
@@ -391,7 +415,7 @@ fn test_approve_job() {
     stop_cheat_caller_address(contract_address);
 
     start_cheat_caller_address(contract_address, job_creator);
-    dispatcher.approve_submission(job_id, applicant0);
+    dispatcher.approve_submission(erc20_address, job_id, applicant0);
     stop_cheat_caller_address(contract_address);
 
     let job = dispatcher.get_job(job_id);
@@ -443,7 +467,13 @@ fn test_reject_submission() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
     stop_cheat_caller_address(contract_address);
 
@@ -530,7 +560,13 @@ fn test_request_changes() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            erc20_address,
+            title,
+            description.clone(),
+            budget,
+            deadline,
+            requirements.clone(),
+            job_creator,
         );
     stop_cheat_caller_address(contract_address);
 

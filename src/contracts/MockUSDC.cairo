@@ -4,15 +4,6 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IExternal<ContractState> {
     fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256);
-    fn balance(ref self: ContractState, user: ContractAddress) -> u256;
-    fn approve_user(ref self: ContractState, spender: ContractAddress, amount: u256);
-    fn transfer_fromm(
-        ref self: ContractState, sender: ContractAddress, receiver: ContractAddress, amount: u256,
-    ) -> bool;
-    fn transferr(ref self: ContractState, receiver: ContractAddress, amount: u256) -> bool;
-    fn get_allowance(
-        ref self: ContractState, owner: ContractAddress, spender: ContractAddress,
-    ) -> u256;
 }
 #[starknet::contract]
 pub mod MockUsdc {
@@ -77,37 +68,6 @@ pub mod MockUsdc {
     impl ExternalImpl of super::IExternal<ContractState> {
         fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
             self.erc20.mint(recipient, amount);
-        }
-
-        fn balance(ref self: ContractState, user: ContractAddress) -> u256 {
-            let balance = self.erc20.balance_of(user);
-            balance
-        }
-
-        fn approve_user(ref self: ContractState, spender: ContractAddress, amount: u256) {
-            self.erc20.approve(spender, amount);
-        }
-
-        fn transfer_fromm(
-            ref self: ContractState,
-            sender: ContractAddress,
-            receiver: ContractAddress,
-            amount: u256,
-        ) -> bool {
-            let success = self.erc20.transfer_from(sender, receiver, amount);
-            success
-        }
-
-        fn transferr(ref self: ContractState, receiver: ContractAddress, amount: u256) -> bool {
-            let success = self.erc20.transfer(receiver, amount);
-            success
-        }
-
-        fn get_allowance(
-            ref self: ContractState, owner: ContractAddress, spender: ContractAddress,
-        ) -> u256 {
-            let allowed_amount = self.erc20.allowance(owner, spender);
-            allowed_amount
         }
     }
 }
