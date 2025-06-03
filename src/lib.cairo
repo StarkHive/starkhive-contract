@@ -1,5 +1,6 @@
 pub mod contracts {
     pub mod Jobs;
+    pub mod MockUSDC;
     pub mod Dispute;
 }
 pub mod base {
