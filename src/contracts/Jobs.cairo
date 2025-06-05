@@ -7,6 +7,8 @@ pub mod Jobs {
         Applicant, ApplicationStatus, ExperienceLevel, Job, JobCategory, JobDuration, Status,
     };
     use starkhive_contract::interfaces::IJobs::IJobs;
+    use starkhive_contract::interfaces::IOracleManager::IOracleManagerTrait;
+    use starknet::ContractAddress as OracleManagerAddress;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
@@ -31,6 +33,8 @@ pub mod Jobs {
         duration_job_count: Map<u8, u256>,
         jobs_by_experience: Map<(u8, u256), u256>,
         experience_job_count: Map<u8, u256>,
+        // OracleManager integration
+        oracle_manager: OracleManagerAddress,
     }
 
     #[event]
@@ -107,6 +111,11 @@ pub mod Jobs {
 
     #[abi(embed_v0)]
     impl JobsImpl of IJobs<ContractState> {
+        // Set OracleManager address (admin only, or via constructor)
+        fn set_oracle_manager(ref self: ContractState, oracle_manager: OracleManagerAddress) {
+            // TODO: add admin check
+            self.oracle_manager.write(oracle_manager);
+        }
         fn register(ref self: ContractState) {}
 
         fn create_job(
@@ -123,6 +132,13 @@ pub mod Jobs {
             duration: JobDuration,
             location: felt252,
         ) -> u256 {
+            // Normalize token address to symbol for OracleManager (assume token symbol is passed as felt252 for now)
+            let token_symbol: felt252 = token.into(); // TODO: Replace with actual mapping/token registry if needed
+            let oracle_manager_addr = self.oracle_manager.read();
+            let oracle_manager = IOracleManagerTrait { contract_address: oracle_manager_addr };
+            let (usd_budget, status) = oracle_manager.to_usd(token_symbol, budget);
+            // Optionally revert if price is missing or stale
+            assert(status == OracleStatus::Ok || status == OracleStatus::Fallback, 'Invalid price');
             assert(budget <= budget_max, 'Min budget exceeds max');
             assert(deadline > get_block_timestamp(), 'Deadline must be in future');
 
@@ -150,7 +166,10 @@ pub mod Jobs {
                 experience_level,
                 duration,
                 location,
+                usd_budget, // Add to struct definition if not present
             };
+            // Emit conversion event
+            // TODO: emit ConversionPerformed(token_symbol, budget, usd_budget);
 
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
             let contract_address = get_contract_address();
@@ -417,18 +436,23 @@ pub mod Jobs {
 
             assert(job.owner == caller, 'Not your job');
 
-            applicant.application_status = ApplicationStatus::Accepted;
+            // OracleManager conversion
+            let token_symbol: felt252 = token.into();
+            let oracle_manager_addr = self.oracle_manager.read();
+            let oracle_manager = IOracleManagerTrait { contract_address: oracle_manager_addr };
+            let (usd_value, status) = oracle_manager.to_usd(token_symbol, job.budget);
+            assert(status == OracleStatus::Ok || status == OracleStatus::Fallback, 'Invalid price for payout');
+            // Emit conversion event
+            // TODO: emit ConversionPerformed(token_symbol, job.budget, usd_value);
 
+            applicant.application_status = ApplicationStatus::Accepted;
             job.status = Status::Completed;
 
             let success = self.pay_applicant(token, job.applicant, job.budget);
-
             assert(success, 'Applicant payment failed');
 
             self.job_applicants.write((job_id, applicant_id), applicant);
-
             self.jobs.write(job_id, job);
-
             self.emit(JobAccepted { job_id, assignee: caller });
         }
         fn cancel_job(ref self: ContractState, token: ContractAddress, job_id: u256) {
@@ -438,15 +462,22 @@ pub mod Jobs {
             assert(job.owner == caller, 'Not your job');
             assert(job.status == Status::Open, 'job cannot be cancelled');
 
-            job.status = Status::Cancelled;
+            // OracleManager conversion for refund
+            let token_symbol: felt252 = token.into();
+            let oracle_manager_addr = self.oracle_manager.read();
+            let oracle_manager = IOracleManagerTrait { contract_address: oracle_manager_addr };
+            let (usd_value, status) = oracle_manager.to_usd(token_symbol, job.budget);
+            assert(status == OracleStatus::Ok || status == OracleStatus::Fallback, 'Invalid price for refund');
+            // Emit conversion event
+            // TODO: emit ConversionPerformed(token_symbol, job.budget, usd_value);
 
+            job.status = Status::Cancelled;
             let receiver = job.owner;
             let amount = job.budget;
 
             let erc20_dispatcher = IERC20Dispatcher { contract_address: token };
             let contract_address = get_contract_address();
             let contract_balance = erc20_dispatcher.balance_of(contract_address);
-
             assert(contract_balance >= amount, 'insufficient balance contract');
 
             let success = self.pay_applicant(token, receiver, amount);
@@ -454,7 +485,6 @@ pub mod Jobs {
 
             job.budget = 0;
             self.jobs.write(job_id, job);
-
             self.emit(JobCancelled { job_id, cancelled_by: caller });
         }
 
