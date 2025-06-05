@@ -1,8 +1,10 @@
 use snforge_std::{
     CheatSpan, ContractClassTrait, DeclareResultTrait, cheat_caller_address, declare,
-    stop_cheat_caller_address,
+    start_cheat_caller_address, stop_cheat_caller_address,
 };
-use starkhive_contract::base::types::{ApplicationStatus, Job, Status};
+use starkhive_contract::base::types::{
+    ApplicationStatus, ExperienceLevel, Job, JobCategory, JobDuration, Status,
+};
 use starkhive_contract::interfaces::IJobs::{IJobsDispatcher, IJobsDispatcherTrait};
 use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
@@ -39,7 +41,18 @@ fn test_job() {
 
     // Call create_job
     let job_id = dispatcher
-        .create_job(title, description.clone(), budget, deadline, requirements.clone(), user);
+        .create_job(
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
+        );
 
     // Validate that the coujobrse ID is correctly incremented
     assert(job_id == 1, 'job_id should start from 1');
@@ -79,7 +92,16 @@ fn test_assign_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
 
     // Validate that the coujobrse ID is correctly incremented
@@ -137,7 +159,16 @@ fn test_multiple_apply_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
     stop_cheat_caller_address(contract_address);
     // Validate that the coujobrse ID is correctly incremented
@@ -189,7 +220,16 @@ fn test_submit_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
     stop_cheat_caller_address(contract_address);
 
@@ -256,7 +296,16 @@ fn test_approve_job() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
     stop_cheat_caller_address(contract_address);
 
@@ -327,7 +376,16 @@ fn test_reject_submission() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
     stop_cheat_caller_address(contract_address);
 
@@ -399,7 +457,16 @@ fn test_request_changes() {
     // Call create_job
     let job_id = dispatcher
         .create_job(
-            title, description.clone(), budget, deadline, requirements.clone(), job_creator,
+            title,
+            description.clone(),
+            budget,
+            budget, // budget_max same as budget for test
+            deadline,
+            requirements.clone(),
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
         );
     stop_cheat_caller_address(contract_address);
 
@@ -446,6 +513,131 @@ fn test_request_changes() {
     assert(job.applicant == applicant, 'job assignment error');
     assert(lucky_guy.application_status == ApplicationStatus::Pending, 'Lucky guy error');
 }
+
+#[test]
+fn test_search_jobs() {
+    let contract_address = setup();
+    let dispatcher = IJobsDispatcher { contract_address };
+
+    // Create multiple jobs with different properties
+    let job_creator: ContractAddress = contract_address_const::<'jobcreator'>();
+    let deadline = get_block_timestamp() + 84600;
+
+    // First job - Tech, Entry level, Remote, Low budget
+    start_cheat_caller_address(contract_address, job_creator);
+    let _job1 = dispatcher
+        .create_job(
+            'Junior Dev',
+            "Entry level position",
+            100, // budget
+            200, // budget_max
+            deadline,
+            "No experience needed",
+            JobCategory::Technology,
+            ExperienceLevel::Entry,
+            JobDuration::OneTime,
+            'remote'.into(),
+        );
+
+    // Second job - Design, Senior level, Office, High budget
+    let _job2 = dispatcher
+        .create_job(
+            'Senior Designer',
+            "Senior position",
+            1000,
+            2000,
+            deadline,
+            "5 years experience",
+            JobCategory::Design,
+            ExperienceLevel::Senior,
+            JobDuration::LongTerm,
+            'office'.into(),
+        );
+
+    // Third job - Tech, Senior level, Remote, High budget
+    let _job3 = dispatcher
+        .create_job(
+            'Senior Dev',
+            "Senior position",
+            1500,
+            3000,
+            deadline,
+            "8 years experience",
+            JobCategory::Technology,
+            ExperienceLevel::Senior,
+            JobDuration::LongTerm,
+            'remote'.into(),
+        );
+    stop_cheat_caller_address(contract_address);
+
+    // Test 1: No filters should return all jobs
+    let all_jobs = dispatcher
+        .search_jobs(
+            Option::None, Option::None, Option::None, Option::None, Option::None, Option::None,
+        );
+    assert(all_jobs.len() == 3, 'Should find all 3 jobs');
+
+    // Test 2: Filter by category
+    let tech_jobs = dispatcher
+        .search_jobs(
+            Option::Some(JobCategory::Technology),
+            Option::None,
+            Option::None,
+            Option::None,
+            Option::None,
+            Option::None,
+        );
+    assert(tech_jobs.len() == 2, 'Should find 2 tech jobs');
+
+    // Test 3: Filter by experience level
+    let senior_jobs = dispatcher
+        .search_jobs(
+            Option::None,
+            Option::None,
+            Option::None,
+            Option::None,
+            Option::Some(ExperienceLevel::Senior),
+            Option::None,
+        );
+    assert(senior_jobs.len() == 2, 'Should find 2 senior jobs');
+
+    // Test 4: Filter by location
+    let remote_jobs = dispatcher
+        .search_jobs(
+            Option::None,
+            Option::None,
+            Option::None,
+            Option::Some('remote'.into()),
+            Option::None,
+            Option::None,
+        );
+    assert(remote_jobs.len() == 2, 'Should find 2 remote jobs');
+
+    // Test 5: Filter by budget range
+    let high_budget_jobs = dispatcher
+        .search_jobs(
+            Option::None,
+            Option::Some(1000),
+            Option::Some(3000),
+            Option::None,
+            Option::None,
+            Option::None,
+        );
+    assert(high_budget_jobs.len() == 2, 'Should find 2 high budget jobs');
+
+    // Test 6: Multiple filters combined
+    let filtered_jobs = dispatcher
+        .search_jobs(
+            Option::Some(JobCategory::Technology),
+            Option::Some(1000),
+            Option::None,
+            Option::Some('remote'.into()),
+            Option::Some(ExperienceLevel::Senior),
+            Option::Some(JobDuration::LongTerm),
+        );
+    assert(filtered_jobs.len() == 1, 'Should find 1 specific job');
+}
+
 // #[test]
 // #[should_panic(expected: ('Not the content creator',))]
 
