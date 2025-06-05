@@ -1,20 +1,27 @@
 #[starknet::contract]
 pub mod Dispute {
-    use starkhive_contract::base::types::{Dispute, DisputeStatus, Evidence, VoteInfo, ArbitratorInfo};
+    use starkhive_contract::base::types::{
+        ArbitratorInfo, Dispute, DisputeStatus, Evidence, VoteInfo,
+    };
     use starkhive_contract::interfaces::IDispute::IDispute;
-    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess, StoragePointerWriteAccess};
-    use starknet::{ContractAddress, contract_address_const, get_block_timestamp, get_caller_address};
+    use starknet::storage::{
+        Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
+        StoragePointerWriteAccess,
+    };
+    use starknet::{
+        ContractAddress, contract_address_const, get_block_timestamp, get_caller_address,
+    };
 
     // --------------- Storage -----------------
     #[storage]
     struct Storage {
-        disputes: Map<u256, Dispute>,               // dispute_id -> Dispute
+        disputes: Map<u256, Dispute>, // dispute_id -> Dispute
         dispute_counter: u256,
-        evidence_counter: Map<u256, u256>,          // dispute_id -> next evidence id
-        evidences: Map<(u256, u256), Evidence>,     // (dispute_id, evidence_id) -> Evidence
+        evidence_counter: Map<u256, u256>, // dispute_id -> next evidence id
+        evidences: Map<(u256, u256), Evidence>, // (dispute_id, evidence_id) -> Evidence
         votes: Map<(u256, ContractAddress), VoteInfo>, // (dispute_id, arbitrator) -> VoteInfo
         arbitrators: Map<ContractAddress, ArbitratorInfo>, // reputation mapping
-        multi_sig: ContractAddress,                // multi-sig wallet that can penalise
+        multi_sig: ContractAddress // multi-sig wallet that can penalise
     }
 
     // --------------- Events ------------------
@@ -127,11 +134,16 @@ pub mod Dispute {
         fn submit_evidence(ref self: ContractState, dispute_id: u256, data: ByteArray) {
             let caller = get_caller_address();
             let dispute = self.disputes.read(dispute_id);
-            assert(dispute.status == DisputeStatus::Open || dispute.status == DisputeStatus::Voting, 'wrong_status');
+            assert(
+                dispute.status == DisputeStatus::Open || dispute.status == DisputeStatus::Voting,
+                'wrong_status',
+            );
 
             let next_id = self.evidence_counter.read(dispute_id) + 1;
             let now = get_block_timestamp();
-            let ev = Evidence { dispute_id, evidence_id: next_id, submitter: caller, data, submitted_at: now };
+            let ev = Evidence {
+                dispute_id, evidence_id: next_id, submitter: caller, data, submitted_at: now,
+            };
             self.evidences.write((dispute_id, next_id), ev);
             self.evidence_counter.write(dispute_id, next_id);
             self.emit(EvidenceSubmitted { dispute_id, evidence_id: next_id, submitter: caller });
@@ -154,7 +166,9 @@ pub mod Dispute {
             // reputation weight
             let arbitrator_info = self.arbitrators.read(caller);
             let weight: u256 = 1_u256;
-            let vi = VoteInfo { dispute_id, arbitrator: caller, support, weight, submitted_at: now };
+            let vi = VoteInfo {
+                dispute_id, arbitrator: caller, support, weight, submitted_at: now,
+            };
             self.votes.write((dispute_id, caller), vi);
 
             // Work around Cairo move semantics: move `dispute` once into a new mutable var,
@@ -172,7 +186,10 @@ pub mod Dispute {
             let mut dispute = self.disputes.read(dispute_id);
             let now = get_block_timestamp();
             assert(now >= dispute.voting_deadline, 'too_early');
-            assert(dispute.status == DisputeStatus::Voting || dispute.status == DisputeStatus::Open, 'wrong_status');
+            assert(
+                dispute.status == DisputeStatus::Voting || dispute.status == DisputeStatus::Open,
+                'wrong_status',
+            );
 
             // Simplified: first implementation just awards claimant.
             let winner = dispute.clone().claimant;
@@ -185,7 +202,10 @@ pub mod Dispute {
             let caller = get_caller_address();
             let mut dispute = self.disputes.read(dispute_id);
             assert(dispute.status == DisputeStatus::Resolved, 'not_resolved');
-            assert(caller == dispute.clone().claimant || caller == dispute.clone().respondent, 'only_party');
+            assert(
+                caller == dispute.clone().claimant || caller == dispute.clone().respondent,
+                'only_party',
+            );
             dispute.status = DisputeStatus::Appealed;
             dispute.voting_deadline = get_block_timestamp() + 2 * 24 * 60 * 60; // 2 days
             self.disputes.write(dispute_id, dispute);
@@ -207,7 +227,9 @@ pub mod Dispute {
             d
         }
 
-        fn get_vote(self: @ContractState, dispute_id: u256, arbitrator: ContractAddress) -> VoteInfo {
+        fn get_vote(
+            self: @ContractState, dispute_id: u256, arbitrator: ContractAddress,
+        ) -> VoteInfo {
             let v = self.votes.read((dispute_id, arbitrator));
             v
         }

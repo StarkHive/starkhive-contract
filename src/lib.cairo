@@ -1,8 +1,8 @@
 pub mod contracts {
+    pub mod Dispute;
     pub mod Jobs;
     pub mod fee_manager; // 🔐 FeeManager contract for fee collection and treasury
     pub mod MockUSDC;
-    pub mod Dispute;
 }
 
 pub mod base {
@@ -10,6 +10,6 @@ pub mod base {
 }
 
 pub mod interfaces {
-    pub mod IJobs;
     pub mod IDispute;
+    pub mod IJobs;
 }
