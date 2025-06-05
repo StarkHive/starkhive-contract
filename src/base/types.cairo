@@ -15,7 +15,7 @@ pub struct Job {
     pub updated_at: u64,
     pub created_at: u64,
 }
- 
+
 #[derive(Drop, Serde, starknet::Store, Clone)]
 pub struct Applicant {
     pub address: ContractAddress,
@@ -63,6 +63,14 @@ pub enum DisputeStatus {
     Closed,
 }
 
+#[derive(Debug, Drop, Serde, starknet::Store, Clone, PartialEq)]
+enum UserVerificationStatus {
+    Unverified,
+    Pending,
+    Verified,
+    Rejected,
+}
+
 // Added Copy derive so `Dispute` instances can be duplicated without moving,
 // which fixes "Variable was previously moved" errors in contract logic that
 // needs to access the struct multiple times.
@@ -100,3 +108,21 @@ pub struct ArbitratorInfo {
     pub address: ContractAddress,
     pub reputation: u256,
 }
+
+
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct Profile {
+    pub profile_address: ContractAddress,
+    pub name: felt252,
+    pub bio: felt252,
+}
+
+
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct WorkEntries {
+    pub org: felt252,
+    pub role: felt252,
+    pub duration_months: u64,
+    pub description: felt252,
+}
+

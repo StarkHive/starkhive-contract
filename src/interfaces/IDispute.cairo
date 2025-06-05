@@ -1,4 +1,4 @@
-use starkhive_contract::base::types::{Dispute, VoteInfo, ArbitratorInfo};
+use starkhive_contract::base::types::{ArbitratorInfo, Dispute, VoteInfo};
 use starknet::ContractAddress;
 
 #[starknet::interface]
@@ -12,17 +12,9 @@ pub trait IDispute<TContractState> {
         respondent: ContractAddress,
     ) -> u256;
 
-    fn submit_evidence(
-        ref self: TContractState,
-        dispute_id: u256,
-        data: ByteArray,
-    );
+    fn submit_evidence(ref self: TContractState, dispute_id: u256, data: ByteArray);
 
-    fn vote(
-        ref self: TContractState,
-        dispute_id: u256,
-        support: bool,
-    );
+    fn vote(ref self: TContractState, dispute_id: u256, support: bool);
 
     fn resolve_dispute(ref self: TContractState, dispute_id: u256);
 
