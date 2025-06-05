@@ -52,6 +52,7 @@ pub struct Job {
     pub experience_level: ExperienceLevel,
     pub duration: JobDuration,
     pub location: felt252,
+    pub usd_budget: u256, // Normalized USD value (18 decimals)
 }
 
 #[derive(Drop, Serde, starknet::Store, Clone)]
