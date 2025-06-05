@@ -51,7 +51,7 @@ pub struct Job {
     pub category: JobCategory,
     pub experience_level: ExperienceLevel,
     pub duration: JobDuration,
-    pub location: felt252
+    pub location: felt252,
 }
 
 #[derive(Drop, Serde, starknet::Store, Clone)]
@@ -87,4 +87,54 @@ pub enum ApplicationStatus {
     Accepted,
     Rejected,
     JobCancelled,
+}
+
+// ---------------- Dispute Resolution Types ----------------
+
+#[derive(Debug, Drop, Serde, starknet::Store, Clone, PartialEq)]
+pub enum DisputeStatus {
+    #[default]
+    Open,
+    Voting,
+    Resolved,
+    Appealed,
+    Closed,
+}
+
+// Added Copy derive so `Dispute` instances can be duplicated without moving,
+// which fixes "Variable was previously moved" errors in contract logic that
+// needs to access the struct multiple times.
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct Dispute {
+    pub dispute_id: u256,
+    pub job_id: u256,
+    pub claimant: ContractAddress,
+    pub respondent: ContractAddress,
+    pub status: DisputeStatus,
+    pub voting_deadline: u64,
+    pub created_at: u64,
+}
+
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct Evidence {
+    pub dispute_id: u256,
+    pub evidence_id: u256,
+    pub submitter: ContractAddress,
+    pub data: ByteArray,
+    pub submitted_at: u64,
+}
+
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct VoteInfo {
+    pub dispute_id: u256,
+    pub arbitrator: ContractAddress,
+    pub support: bool,
+    pub weight: u256,
+    pub submitted_at: u64,
+}
+
+#[derive(Drop, Serde, starknet::Store, Clone)]
+pub struct ArbitratorInfo {
+    pub address: ContractAddress,
+    pub reputation: u256,
 }
