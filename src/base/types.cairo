@@ -139,3 +139,10 @@ pub struct ArbitratorInfo {
     pub address: ContractAddress,
     pub reputation: u256,
 }
+
+#[derive(Copy, Drop, Serde, PartialEq)]
+enum OracleStatus {
+    Ok,
+    Fallback,
+    Error
+}

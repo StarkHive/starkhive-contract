@@ -5,6 +5,8 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IJobs<TContractState> {
+    fn set_oracle_manager(ref self: TContractState, oracle_manager: ContractAddress);
+    fn set_reputation_nft(ref self: TContractState, reputation_nft: ContractAddress);
     fn register(ref self: TContractState);
 
     fn create_job(
@@ -33,7 +35,7 @@ pub trait IJobs<TContractState> {
         self: @TContractState, token: ContractAddress, address: ContractAddress,
     ) -> u256;
 
-    fn apply_for_job(ref self: TContractState, job_id: u256, qualification: ByteArray) -> u256;
+    fn apply_for_job(ref self: TContractState, job_id: u256, proposal: ByteArray) -> u256;
     fn submit_job(ref self: TContractState, job_id: u256, applicant_id: u256);
     fn approve_submission(
         ref self: TContractState, token: ContractAddress, job_id: u256, applicant_id: u256,
