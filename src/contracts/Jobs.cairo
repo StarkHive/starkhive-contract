@@ -8,6 +8,7 @@ pub mod Jobs {
     };
     use starkhive_contract::interfaces::IJobs::IJobs;
     use starkhive_contract::interfaces::IOracleManager::IOracleManagerTrait;
+    use starkhive_contract::interfaces::IReputationNFT::{IReputationNFTDispatcher, IReputationNFTDispatcherTrait};
     use starknet::ContractAddress as OracleManagerAddress;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
@@ -35,6 +36,7 @@ pub mod Jobs {
         experience_job_count: Map<u8, u256>,
         // OracleManager integration
         oracle_manager: OracleManagerAddress,
+        reputation_nft: ContractAddress,
     }
 
     #[event]
@@ -116,6 +118,12 @@ pub mod Jobs {
             // TODO: add admin check
             self.oracle_manager.write(oracle_manager);
         }
+
+        fn set_reputation_nft(ref self: ContractState, reputation_nft: ContractAddress) {
+            // TODO: add admin check
+            self.reputation_nft.write(reputation_nft);
+        }
+
         fn register(ref self: ContractState) {}
 
         fn create_job(
@@ -442,14 +450,36 @@ pub mod Jobs {
             let oracle_manager = IOracleManagerTrait { contract_address: oracle_manager_addr };
             let (usd_value, status) = oracle_manager.to_usd(token_symbol, job.budget);
             assert(status == OracleStatus::Ok || status == OracleStatus::Fallback, 'Invalid price for payout');
-            // Emit conversion event
-            // TODO: emit ConversionPerformed(token_symbol, job.budget, usd_value);
 
             applicant.application_status = ApplicationStatus::Accepted;
             job.status = Status::Completed;
 
             let success = self.pay_applicant(token, job.applicant, job.budget);
             assert(success, 'Applicant payment failed');
+
+            // Mint reputation NFT for successful job completion
+            let reputation_nft = IReputationNFTDispatcher { contract_address: self.reputation_nft.read() };
+            let skill_category = match job.category {
+                JobCategory::Technology => 'TECHNOLOGY',
+                JobCategory::Design => 'DESIGN',
+                JobCategory::Marketing => 'MARKETING',
+                JobCategory::Writing => 'WRITING',
+                JobCategory::Business => 'BUSINESS',
+                JobCategory::Finance => 'FINANCE',
+                JobCategory::Other => 'OTHER',
+            };
+            
+            // Mint NFT with initial rating of 80 for successful completion
+            let token_id = reputation_nft.mint(job.applicant, skill_category);
+            reputation_nft.update_rating(token_id, 80);
+            
+            // Add achievement for job completion
+            let achievement = match job.experience_level {
+                ExperienceLevel::Beginner => 'COMPLETED_BEGINNER_JOB',
+                ExperienceLevel::Intermediate => 'COMPLETED_INTERMEDIATE_JOB',
+                ExperienceLevel::Expert => 'COMPLETED_EXPERT_JOB',
+            };
+            reputation_nft.add_achievement(token_id, achievement);
 
             self.job_applicants.write((job_id, applicant_id), applicant);
             self.jobs.write(job_id, job);
