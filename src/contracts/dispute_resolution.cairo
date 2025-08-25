@@ -152,3 +152,53 @@ mod DisputeResolution {
         AppealInitiated: AppealInitiated,
         PenaltyApplied: PenaltyApplied,
     }
+
+    #[derive(Drop, starknet::Event)]
+    struct DisputeInitiated {
+        dispute_id: u256,
+        initiator: ContractAddress,
+        escrow_id: u256,
+        amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct EvidenceSubmitted {
+        dispute_id: u256,
+        submitter: ContractAddress,
+        evidence_hash: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct ArbitratorsSelected {
+        dispute_id: u256,
+        arbitrator_count: u8,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct VoteCast {
+        dispute_id: u256,
+        arbitrator: ContractAddress,
+        vote: u8,
+        weight: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct DisputeResolved {
+        dispute_id: u256,
+        resolution: u8,
+        payout_amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct AppealInitiated {
+        dispute_id: u256,
+        appellant: ContractAddress,
+        appeal_id: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct PenaltyApplied {
+        dispute_id: u256,
+        penalized_party: ContractAddress,
+        penalty_amount: u256,
+    }
