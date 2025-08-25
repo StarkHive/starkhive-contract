@@ -465,3 +465,36 @@ mod DisputeResolution {
             self.disputes.read(dispute_id)
         }
     }
+
+    #[generate_trait]
+    impl InternalImpl of InternalTrait {
+        fn _calculate_vote_weight(self: @ContractState, reputation: u256) -> u256 {
+            // Simple reputation-based weighting
+            // Higher reputation = higher vote weight
+            if reputation >= 1000 {
+                reputation / 100
+            } else {
+                1
+            }
+        }
+
+        fn _calculate_resolution(self: @ContractState, dispute_id: u256) -> (Resolution, u256) {
+            // Simplified resolution calculation
+            // In practice, this would analyze all votes and their weights
+            (Resolution::ApproveInitiator, 0)
+        }
+
+        fn _apply_penalty(ref self: ContractState, party: ContractAddress, dispute_id: u256) {
+            let penalty = self.penalty_amount.read();
+            
+            // Apply penalty logic here
+            // This would integrate with token contracts or reputation systems
+            
+            self.emit(PenaltyApplied {
+                dispute_id,
+                penalized_party: party,
+                penalty_amount: penalty,
+            });
+        }
+    }
+}
