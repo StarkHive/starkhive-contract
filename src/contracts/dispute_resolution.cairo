@@ -110,3 +110,45 @@ struct Vote {
     reasoning: felt252,
     timestamp: u64,
 }
+
+#[starknet::contract]
+mod DisputeResolution {
+    use super::{
+        IDisputeResolution, DisputeInfo, DisputeStatus, DisputeResolution as Resolution,
+        Evidence, Arbitrator, Vote
+    };
+    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+    use starknet::storage::{
+        StoragePointerReadAccess, StoragePointerWriteAccess,
+        Map, StoragePathEntry
+    };
+
+    #[storage]
+    struct Storage {
+        owner: ContractAddress,
+        dispute_counter: u256,
+        disputes: Map<u256, DisputeInfo>,
+        dispute_evidence: Map<(u256, u32), Evidence>,
+        arbitrators: Map<ContractAddress, Arbitrator>,
+        arbitrator_assignments: Map<(u256, u32), ContractAddress>,
+        votes: Map<(u256, ContractAddress), Vote>,
+        escrow_contract: ContractAddress,
+        multisig_contract: ContractAddress,
+        min_arbitrators: u8,
+        max_arbitrators: u8,
+        voting_period: u64, // in seconds
+        appeal_period: u64,
+        penalty_amount: u256,
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    enum Event {
+        DisputeInitiated: DisputeInitiated,
+        EvidenceSubmitted: EvidenceSubmitted,
+        ArbitratorsSelected: ArbitratorsSelected,
+        VoteCast: VoteCast,
+        DisputeResolved: DisputeResolved,
+        AppealInitiated: AppealInitiated,
+        PenaltyApplied: PenaltyApplied,
+    }
