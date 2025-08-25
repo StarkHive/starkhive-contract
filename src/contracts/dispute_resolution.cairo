@@ -48,3 +48,65 @@ trait IDisputeResolution<TContractState> {
     
     fn get_dispute_details(self: @TContractState, dispute_id: u256) -> DisputeInfo;
 }
+
+#[derive(Drop, Serde, starknet::Store)]
+struct DisputeInfo {
+    id: u256,
+    initiator: ContractAddress,
+    respondent: ContractAddress,
+    escrow_id: u256,
+    disputed_amount: u256,
+    status: DisputeStatus,
+    created_at: u64,
+    voting_deadline: u64,
+    evidence_count: u32,
+    arbitrator_votes: u32,
+    total_arbitrators: u32,
+    resolution: DisputeResolution,
+    appeal_count: u8,
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+enum DisputeStatus {
+    Initiated,
+    ArbitratorsSelected,
+    EvidenceSubmission,
+    Voting,
+    Resolved,
+    Appealed,
+    Finalized,
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+enum DisputeResolution {
+    Pending,
+    ApproveInitiator,
+    ApproveRespondent,
+    PartialResolution: u256, // percentage to initiator
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+struct Evidence {
+    submitter: ContractAddress,
+    evidence_hash: felt252,
+    evidence_type: u8, // 1 = document, 2 = transaction, 3 = witness
+    timestamp: u64,
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+struct Arbitrator {
+    address: ContractAddress,
+    reputation_score: u256,
+    total_cases: u32,
+    successful_cases: u32,
+    is_active: bool,
+}
+
+#[derive(Drop, Serde, starknet::Store)]
+struct Vote {
+    arbitrator: ContractAddress,
+    vote: u8,
+    weight: u256,
+    reasoning: felt252,
+    timestamp: u64,
+}
